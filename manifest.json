@@ -1,0 +1,17 @@
+{
+  "name": "CIP Early Warning · ALCOA+",
+  "short_name": "CIP Warning",
+  "description": "Раннее предупреждение задержек CIP-мойки и журнал целостности данных по ALCOA+",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#16332E",
+  "theme_color": "#16332E",
+  "lang": "ru",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

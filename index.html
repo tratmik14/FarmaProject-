@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CIP Early Warning · ALCOA+</title>
+<meta name="description" content="Раннее предупреждение задержек CIP-мойки и журнал целостности данных по ALCOA+">
+<meta name="theme-color" content="#16332E">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="dot" id="statusDot"></span>
+    <div>
+      <h1>CIP Early Warning</h1>
+      <p>Узел: CIP-станция № 1 · ALCOA+</p>
+    </div>
+  </div>
+  <span class="pill" id="statusPill">норма</span>
+</div>
+
+<main>
+
+  <div class="install-banner" id="installBanner">
+    <span>Установите приложение на экран — оно будет работать и офлайн.</span>
+    <button class="primary" id="installBtn">Установить</button>
+  </div>
+
+  <!-- ДАШБОРД -->
+  <section class="view active" id="view-dashboard">
+
+    <div class="banner" id="warnBanner" style="display:none"></div>
+
+    <div class="card">
+      <h2>Симуляция цикла</h2>
+      <p class="sub">Демо-данные: это не показания реального оборудования, а синтетический генератор для наглядности интерфейса.</p>
+      <div class="row between">
+        <select id="scenarioSelect"></select>
+        <div class="row">
+          <button id="startBtn" class="primary">Старт</button>
+          <button id="pauseBtn" disabled>Пауза</button>
+          <button id="resetBtn" class="ghost">Сброс</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span class="small" id="cycleClock">Цикл не запущен</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Прогноз задержки</h2>
+      <p class="sub">Эвристика для демонстрации интерфейса (не обученная модель прототипа — см. раздел «О проекте»).</p>
+      <div class="row between">
+        <div>
+          <div class="stat-big" id="delayMid">—</div>
+          <div class="stat-label" id="delayRange">нет данных</div>
+        </div>
+        <div style="text-align:right">
+          <div class="stat-big" id="obsMinute">0</div>
+          <div class="stat-label">мин из 45</div>
+        </div>
+      </div>
+      <div id="causeBox" class="draft causes" style="display:none; margin-top:12px">
+        <div class="meta">Вероятная причина</div>
+        <div class="causes" id="causeChips"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Телеметрия vs золотой профиль</h2>
+      <div class="grid" id="channelGrid"></div>
+    </div>
+  </section>
+
+  <!-- ЖУРНАЛ -->
+  <section class="view" id="view-journal">
+    <div class="card">
+      <h2>Журнал целостности (ALCOA+)</h2>
+      <p class="sub">Каждая запись содержит SHA-256 хэш предыдущей записи и подпись оператора. Хранится локально на этом устройстве.</p>
+      <div class="row">
+        <button class="primary" id="verifyBtn">Проверить цепочку</button>
+        <button class="ghost" id="clearJournalBtn">Очистить журнал</button>
+      </div>
+      <p class="small" id="verifyResult" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card">
+      <h2>Демонстрация подделки</h2>
+      <p class="sub">Эти кнопки имитируют попытку задним числом изменить данные — чтобы показать, что цепочка это обнаруживает.</p>
+      <div class="row">
+        <button id="tamperEditBtn">Изменить запись</button>
+        <button id="tamperDeleteBtn">Удалить запись</button>
+        <button id="tamperTruncateBtn">Обрезать хвост (2 записи)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Записи</h2>
+      <div style="overflow-x:auto">
+        <table id="journalTable">
+          <thead><tr><th>№</th><th>Время</th><th>Событие</th><th>Хэш</th><th>Статус</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ОТКЛОНЕНИЯ -->
+  <section class="view" id="view-deviations">
+    <div class="card">
+      <h2>Черновики отклонений для QA</h2>
+      <p class="sub">Формируются автоматически при превышении порога отклонения. Решение всегда принимает QA / уполномоченное лицо — система не блокирует выпуск партии.</p>
+    </div>
+    <div id="draftsList"></div>
+    <p class="small" id="noDrafts">Пока нет ни одного черновика — запустите симуляцию со сценарием отклонения на вкладке «Дашборд».</p>
+  </section>
+
+  <!-- О ПРОЕКТЕ -->
+  <section class="view" id="view-about">
+    <div class="card">
+      <h2>О приложении</h2>
+      <p>Это рабочий демо-прототип интерфейса для конкурсного проекта «Раннее предупреждение задержек CIP-мойки и защищённая фиксация данных по ALCOA+». Приложение — PWA: работает офлайн после первого открытия и может быть установлено на экран устройства.</p>
+      <p class="sub">Телеметрия и прогноз задержки в этом приложении — синтетическая демонстрация логики (золотой профиль + пороги), а не обученная ML-модель. Обученная модель (GradientBoostingRegressor + RandomForestClassifier) и проверенный на тестах журнал с «якорем» реализованы в отдельном Python-прототипе, приложенном к конкурсной работе.</p>
+      <p class="sub">Журнал целостности здесь хранится локально в браузере устройства (демонстрация механизма хэш-цепочки), а не в серверном WORM-хранилище, предусмотренном полной архитектурой.</p>
+    </div>
+    <div class="card">
+      <h2>Уведомления</h2>
+      <p class="sub">Разрешите уведомления, чтобы получать предупреждение о задержке, даже если вкладка свёрнута.</p>
+      <button class="primary" id="notifyBtn">Разрешить уведомления</button>
+      <p class="small" id="notifyStatus" style="margin-top:8px"></p>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button data-view="dashboard" class="active"><span class="ic">◎</span>Дашборд</button>
+  <button data-view="journal"><span class="ic">⛓</span>Журнал</button>
+  <button data-view="deviations"><span class="ic">⚑</span>Отклонения</button>
+  <button data-view="about"><span class="ic">ⓘ</span>О проекте</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script src="./js/data.js"></script>
+<script src="./js/journal.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>
