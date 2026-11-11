@@ -25,13 +25,14 @@ window.addEventListener("appinstalled", () => {
 });
 
 // ---------- табы ----------
-const views = ["dashboard", "journal", "deviations", "about"];
+const views = ["dashboard", "downtime", "journal", "deviations", "about"];
 document.querySelectorAll("nav.tabs button").forEach((btn) => {
   btn.addEventListener("click", () => {
     views.forEach((v) => {
       document.getElementById("view-" + v).classList.toggle("active", v === btn.dataset.view);
     });
     document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+    document.querySelectorAll("nav.tabs button").forEach(b => { if(b === btn) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
     if (btn.dataset.view === "journal") renderJournalTable();
     if (btn.dataset.view === "deviations") renderDrafts();
   });
@@ -149,9 +150,10 @@ function setStatus(level, label) {
 
 document.getElementById("startBtn").addEventListener("click", startCycle);
 document.getElementById("pauseBtn").addEventListener("click", pauseCycle);
-document.getElementById("resetBtn").addEventListener("click", () => { pauseCycle(); resetDashboard(); sim = null; });
+document.getElementById("resetBtn").addEventListener("click", () => { pauseCycle(); resetDashboard(); sim = null; scenarioSelect.disabled=false; });
 
 function startCycle() {
+  if (timer) return;
   if (!sim) {
     sim = createCycleSimulator(scenarioSelect.value);
     resetDashboard();
@@ -170,7 +172,10 @@ function pauseCycle() {
   document.getElementById("pauseBtn").disabled = true;
 }
 
+let stepBusy=false;
 async function stepCycle() {
+ if(stepBusy || !sim) return; stepBusy=true;
+ try {
   const { t, readings, done } = sim.tick();
   document.getElementById("obsMinute").textContent = String(t);
   document.getElementById("cycleClock").textContent = `Минута ${t} из ${CYCLE_MINUTES} · сценарий: ${sim.scenario.label}`;
@@ -190,13 +195,13 @@ async function stepCycle() {
   if (assessment.predictedDelay) {
     document.getElementById("delayMid").textContent = assessment.predictedDelay.mid + " мин";
     document.getElementById("delayRange").textContent =
-      `интервал 10–90%: ${assessment.predictedDelay.low}–${assessment.predictedDelay.high} мин`;
+      `учебный диапазон: ${assessment.predictedDelay.low}–${assessment.predictedDelay.high} мин`;
   }
   if (assessment.likelyCause) {
     const box = document.getElementById("causeBox");
     box.style.display = "block";
     document.getElementById("causeChips").innerHTML =
-      assessment.likelyCause.map((c) => `<span>${c.name} — ${c.pct}%</span>`).join("");
+      assessment.likelyCause.map((c) => `<span>${c.name} (гипотеза)</span>`).join("");
   }
 
   const warnBanner = document.getElementById("warnBanner");
@@ -204,7 +209,7 @@ async function stepCycle() {
     setStatus("crit", "критично");
     warnBanner.className = "banner crit";
     warnBanner.style.display = "flex";
-    warnBanner.textContent = `⚠ Сильное отклонение на минуте ${t}: вероятная задержка ${assessment.predictedDelay ? assessment.predictedDelay.mid : "?"} мин.`;
+    warnBanner.textContent = `Сильное отклонение на минуте ${t}: вероятная задержка ${assessment.predictedDelay ? assessment.predictedDelay.mid : "?"} мин.`;
     if (!draftIssuedThisCycle) {
       draftIssuedThisCycle = true;
       issueDraft(t, readings, assessment);
@@ -231,7 +236,9 @@ async function stepCycle() {
     const finalEntry = await appendJournalEntry({ t, cycle: "demo", event: "cycle_complete", scenario: sim.scenarioKey });
     await maybeAnchor(loadJournal());
     scenarioSelect.disabled = false;
+    document.getElementById("startBtn").disabled = true;
   }
+ } catch(error) { pauseCycle(); toast("Не удалось сохранить данные. Проверьте доступ к хранилищу браузера."); document.getElementById("cycleClock").textContent=error.message; } finally {stepBusy=false;}
 }
 
 // ---------- журнал ----------
@@ -256,11 +263,11 @@ document.getElementById("verifyBtn").addEventListener("click", async () => {
   const tbody = document.querySelector("#journalTable tbody");
   const rows = [...tbody.querySelectorAll("tr")];
   if (result.ok) {
-    out.textContent = `✓ Цепочка цела: ${result.count} записей, ${result.anchors} якорей, нарушений не найдено.`;
+    out.textContent = `Проверка завершена: ${result.count} записей, ${result.anchors} якорей, нарушений не найдено.`;
     out.style.color = "var(--accent)";
     rows.forEach((r) => { r.classList.remove("bad-row"); r.classList.add("ok-row"); if (r.children[4]) r.children[4].textContent = "ок"; });
   } else {
-    out.innerHTML = `✗ Обнаружено ${result.problems.length} нарушени(е/я):<br>` + result.problems.map((p) => `№${p.seq}: ${p.issue}`).join("<br>");
+    out.innerHTML = `Обнаружено ${result.problems.length} нарушени(е/я):<br>` + result.problems.map((p) => `№${p.seq}: ${p.issue}`).join("<br>");
     out.style.color = "var(--crit)";
     const badSeqs = new Set(result.problems.map((p) => p.seq));
     rows.forEach((r) => {
@@ -330,14 +337,14 @@ function renderDrafts() {
     div.innerHTML = `
       <h3>Отклонение № ${d.id}</h3>
       <div class="meta">Сценарий «${d.scenario}» · момент предупреждения: минута ${d.t} · ${new Date(d.createdAt).toLocaleString()}</div>
-      <div>Прогноз задержки: <b>${d.delay ? d.delay.mid + " мин" : "—"}</b>${d.delay ? ` (10–90%: ${d.delay.low}–${d.delay.high} мин)` : ""}</div>
+      <div>Прогноз задержки: <b>${d.delay ? d.delay.mid + " мин" : "—"}</b>${d.delay ? ` (учебный диапазон: ${d.delay.low}–${d.delay.high} мин)` : ""}</div>
       <div>Расход: ${d.flow} м³/ч (z=${d.flowZ})</div>
-      ${d.cause ? `<div class="causes" style="margin-top:6px">${d.cause.map((c) => `<span>${c.name} — ${c.pct}%</span>`).join("")}</div>` : ""}
-      <div class="decision ${d.decision}">${d.decision === "pending" ? "Ожидает решения QA" : d.decision === "approved" ? "Решение QA: партия подтверждена" : "Решение QA: отклонено, разбор инцидента"}</div>
+      ${d.cause ? `<div class="causes" style="margin-top:6px">${d.cause.map((c) => `<span>${c.name} (гипотеза)</span>`).join("")}</div>` : ""}
+      <div class="decision ${d.decision}">${d.decision === "pending" ? "Ожидает разбора специалистом" : d.decision === "approved" ? "Учебная карточка: принята к разбору" : "Учебная карточка: гипотеза отклонена"}</div>
       ${d.decision === "pending" ? `
         <div class="row" style="margin-top:8px">
-          <button class="primary" data-approve="${d.id}">Подтвердить</button>
-          <button class="danger" data-reject="${d.id}">Отклонить</button>
+          <button class="primary" data-approve="${d.id}">Принять к разбору</button>
+          <button class="danger" data-reject="${d.id}">Отклонить гипотезу</button>
         </div>` : ""}
     `;
     list.appendChild(div);
@@ -356,3 +363,5 @@ function decide(id, decision) {
 // ---------- init ----------
 resetDashboard();
 renderDrafts();
+
+window.addEventListener("error",()=>{ document.getElementById("cycleClock").textContent="Ошибка выполнения. Обновите страницу и повторите запуск."; });
